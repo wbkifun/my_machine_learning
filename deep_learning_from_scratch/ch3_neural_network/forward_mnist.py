@@ -7,11 +7,14 @@ Created on Tue Apr 16 14:22:36 2019
 forward propagation with the MNIST dataset
 """
 
-from PIL import Image
+from os.path import abspath, dirname, join
+import sys
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
 
+current_dir = dirname(abspath(__file__))
+common_dir = join(dirname(current_dir), 'common')
+sys.path.append(common_dir)
 from mnist import load_mnist
 from activation import sigmoid, softmax
 
@@ -29,79 +32,62 @@ def load_data(norm=True):
 
 
 
-def plot_img(images, labels, idx):
+def load_network():
     '''
-    plot an digit image
+    load the pre-learned weights
     '''
-    print("label={}".format(labels[idx]))
-    img = images[idx].reshape(28, 28)
-    #pil_img = Image.fromarray(np.uint8(img))
-    #pil_img.show()
-    plt.imshow(img)
-    plt.show()
+    sample_weight_fpath = join(dirname(current_dir), 'data', 'sample_weight.pkl')
 
+    with open(sample_weight_fpath, 'rb') as f:
+        network = pickle.load(f)
 
-
-class NeuralNetwork:
-    def __init__(self):
-        self.x_test, self.t_test = load_data()
+    return network
             
     
-    def forward(self, x):
-        net = self.network
-        
-        W1, W2, W3 = net['W1'], net['W2'], net['W3']
-        b1, b2, b3 = net['b1'], net['b2'], net['b3']
-        
-        a1 = np.dot(x, W1) + b1
-        z1 = sigmoid(a1)
-        a2 = np.dot(z1, W2) + b2
-        z2 = sigmoid(a2)
-        a3 = np.dot(z2, W3) + b3
-        y = softmax(a3)
-        
-        return y
+
+def forward(network, x):
+    net = network
+    
+    W1, W2, W3 = net['W1'], net['W2'], net['W3']
+    b1, b2, b3 = net['b1'], net['b2'], net['b3']
+    
+    a1 = np.dot(x, W1) + b1
+    z1 = sigmoid(a1)
+    a2 = np.dot(z1, W2) + b2
+    z2 = sigmoid(a2)
+    a3 = np.dot(z2, W3) + b3
+    y = softmax(a3)
+    
+    return y
     
     
-    def check_weights(self):        
-        x_test, t_test = self.x_test, self.t_test
-                
-        with open('sample_weight.pkl', 'rb') as f:
-            self.network = pickle.load(f)
+
+def check_weights(network, x_test, t_test):        
+    accuracy_cnt = 0
+    for x, t in zip(x_test, t_test):
+        y = forward(network, x)
+        p = np.argmax(y)  # index of the most probility element
+        if p == t:
+            accuracy_cnt += 1
             
-        accuracy_cnt = 0
-        for x, t in zip(x_test, t_test):
-            y = self.forward(x)
-            p = np.argmax(y)  # index of the most probility element
-            if p == t:
-                accuracy_cnt += 1
-                
-        print("Accuracy: {:2.2f} %".format(accuracy_cnt/len(x_test)*100))            
+    accuracy = accuracy_cnt/len(x_test)
+    #print("Accuracy: {:2.2f} %".format(accuracy*100))            
+
+    return accuracy
             
     
-    def check_weights_batch(self):        
-        x_test, t_test = self.x_test, self.t_test
-                
-        with open('sample_weight.pkl', 'rb') as f:
-            self.network = pickle.load(f)
-        
-        batch_size = 100
-        accuracy_cnt = 0
-        
-        for i in range(0, len(x_test), batch_size):
-            x_b = x_test[i:i+batch_size]
-            y_b = self.forward(x_b)
-            p_b = np.argmax(y_b, axis=1)  # index of the most probility element
-            accuracy_cnt += np.sum(p_b == t_test[i:i+batch_size])
-                
-        print("Accuracy (batch): {:2.2f} %".format(accuracy_cnt/len(x_test)*100))     
-        
+
+def check_weights_batch(network, x_test, t_test):        
+    batch_size = 100
+    accuracy_cnt = 0
     
-    
-if __name__ == '__main__':    
-    images, labels = load_data(norm=False)
-    plot_img(images, labels, idx=0)
-    
-    nn= NeuralNetwork()
-    nn.check_weights()
-    nn.check_weights_batch()
+    for i in range(0, len(x_test), batch_size):
+        x_b = x_test[i:i+batch_size]
+        y_b = forward(network, x_b)
+        p_b = np.argmax(y_b, axis=1)  # index of the most probility element
+        accuracy_cnt += np.sum(p_b == t_test[i:i+batch_size])
+            
+    accuracy = accuracy_cnt/len(x_test)
+    #print("Accuracy(batch): {:2.2f} %".format(accuracy*100))            
+
+    return accuracy
